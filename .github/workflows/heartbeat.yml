@@ -1,0 +1,35 @@
+name: Heartbeat
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 08:00 Europe/Budapest nyáron = 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4  # GITHUB_TOKEN-nel klónoz, push-olni is tud
+
+      - name: Git author
+        run: |
+          git config user.name "APorklab"
+          git config user.email "aporkolab@users.noreply.github.com"
+
+      - name: Touch heartbeat
+        run: |
+          mkdir -p .contrib
+          date -u +"%Y-%m-%d %H:%M:%S UTC" > .contrib/heartbeat.txt
+
+      - name: Commit & push if changed
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore: heartbeat $(date -u +%F)"
+            git push
+          else
+            echo "No changes."
+          fi
