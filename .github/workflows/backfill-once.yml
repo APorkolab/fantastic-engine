@@ -1,0 +1,72 @@
+name: Backfill once
+
+on:
+  workflow_dispatch:
+    inputs:
+      days_before:
+        description: "Hány napra menjünk vissza"
+        default: "180"
+      frequency:
+        description: "A napok %-a, amikor commitolunk (0-100)"
+        default: "60"
+      max_commits:
+        description: "Max commit / nap"
+        default: "6"
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git author
+        run: |
+          git config user.name "APorkolab"
+          git config user.email "aporkolab@users.noreply.github.com"
+
+      - name: Backfill commits (last N days, random)
+        run: |
+          python - <<'PY'
+          import os, subprocess, random
+          from datetime import datetime, timedelta, timezone
+          import sys
+
+          days_before = int(os.getenv("INPUT_DAYS_BEFORE", "180"))
+          frequency = int(os.getenv("INPUT_FREQUENCY", "60"))  # % nap, amikor commitolunk
+          max_commits = int(os.getenv("INPUT_MAX_COMMITS", "6"))
+
+          os.makedirs(".contrib", exist_ok=True)
+          end = datetime.now(timezone.utc) - timedelta(days=1)
+          start = end - timedelta(days=days_before-1)
+
+          def sh(cmd, env=None):
+            subprocess.check_call(cmd, shell=True, env=env)
+
+          changed = False
+          cur = start
+          while cur <= end:
+            if random.randint(1,100) <= frequency:
+              commits = random.randint(1, max_commits)
+              for i in range(commits):
+                # random időpont az adott napon belül (UTC)
+                sec = random.randint(0, 24*3600-1)
+                ts = (cur + timedelta(seconds=sec)).strftime("%Y-%m-%d %H:%M:%S UTC")
+                with open(".contrib/history.txt", "a", encoding="utf-8") as f:
+                  f.write(f"{ts} #{i}\n")
+                env = os.environ.copy()
+                env["GIT_AUTHOR_DATE"] = ts
+                env["GIT_COMMITTER_DATE"] = ts
+                sh('git add .contrib/history.txt', env=env)
+                sh(f'git commit -m "backfill: {ts}"', env=env)
+                changed = True
+            cur += timedelta(days=1)
+
+          if not changed:
+            print("No commits generated (frequency too low?)")
+          PY
+
+      - name: Push
+        run: git push
