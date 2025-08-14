@@ -16,7 +16,7 @@ jobs:
 
       - name: Git author
         run: |
-          git config user.name "APorklab"
+          git config user.name "APorkolab"
           git config user.email "aporkolab@users.noreply.github.com"
 
       - name: Touch heartbeat
